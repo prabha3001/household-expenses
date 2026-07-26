@@ -8,7 +8,7 @@ from functools import wraps
 
 from flask import (
     Flask, request, session, redirect, url_for, flash, render_template,
-    render_template_string, send_file, abort
+    render_template_string, send_file, abort, jsonify
 )
 from werkzeug.utils import secure_filename
 
@@ -340,6 +340,34 @@ def upload_page():
     return render_template('upload.html', user=user, ranges=summary.pick_report_ranges(get_all_months()),
                             active_page='upload', page_title="Upload statement", recent=recent,
                             month_label=summary.month_label)
+
+
+@app.route('/admin/upload/one', methods=['POST'])
+@auth_utils.admin_required
+def upload_one():
+    """Process a single statement PDF and reply with JSON.
+
+    Called from the upload page's JavaScript, once per selected file, so the
+    page can show a real progress bar (X of N files processed) and a
+    per-file success/error result as each one finishes, instead of a single
+    all-or-nothing form submission. Splitting the batch into one short
+    request per file also means one slow or failing PDF can no longer drag
+    the rest of the batch down with it or risk tripping a server-side
+    request timeout on a large batch.
+    """
+    user = auth_utils.current_user()
+    f = request.files.get('file')
+    if not f or not f.filename:
+        return jsonify(category='error', message='No file received.'), 400
+    try:
+        category, message = _process_one_statement(f, user)
+    except Exception as e:
+        # Belt-and-braces: turn any unexpected parsing/database error into a
+        # normal JSON error result for this one file, rather than a raw 500
+        # that the page's JavaScript would have to guess how to interpret.
+        category, message = 'error', f"{secure_filename(f.filename)}: something went wrong processing this file ({e})."
+    status_code = 200 if category == 'success' else 422
+    return jsonify(category=category, message=message), status_code
 
 
 # ---------------- self-service: change own password ----------------
