@@ -20,4 +20,7 @@ EXPOSE 10000
 
 # 2 workers is plenty for a small family app; each worker launches its own
 # short-lived Chromium instance only when a PDF export is requested.
-CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 120 app:app"]
+# --timeout is generous (10 minutes) to comfortably cover a big batch
+# upload (many PDFs at once) on a slow free-tier instance, where each
+# statement's parsing plus its database writes can take a while to add up.
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:$PORT --workers 2 --timeout 600 app:app"]

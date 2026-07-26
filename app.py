@@ -185,7 +185,8 @@ def dashboard(period):
     user = auth_utils.current_user()
     ctx = build_dashboard_context(period)
     if ctx is None:
-        return _empty_state(user)
+        return render_template('base_app.html', user=user, ranges={}, page_title="Household Expenses",
+                                active_page=None) + EMPTY_STATE_HTML if False else _empty_state(user)
     return render_template('dashboard.html', user=user, **ctx)
 
 
@@ -296,17 +297,25 @@ def _process_one_statement(f, user):
             commit=True, returning_id=True,
         )
 
-        for t in txns:
-            db.run(
-                "INSERT INTO transactions (statement_id, account, date, month, txn_desc, amount, dir, type, "
-                "category, subcategory, shopping_subcategory, canonical_merchant, is_dd, is_atm, is_refund) "
-                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                (statement_id, t['account'], t['date'], t['month'], t['desc'], t['amount'], t['dir'],
-                 t.get('type', ''), t['category'], t.get('subcategory', ''), t.get('shopping_subcategory', ''),
-                 t.get('canonical_merchant', ''), int(t.get('is_dd', False)), int(t.get('is_atm', False)),
-                 int(t.get('is_refund', False))),
-                commit=True,
-            )
+        # One round-trip for every transaction on this statement, instead of
+        # one round-trip per transaction — the latter was the main reason a
+        # 12-file batch upload could run long enough to hit gunicorn's
+        # worker timeout on Render's free instance (each query to the remote
+        # Neon database costs real network latency, and a dozen statements
+        # can easily add up to several hundred individual transactions).
+        rows = [
+            (statement_id, t['account'], t['date'], t['month'], t['desc'], t['amount'], t['dir'],
+             t.get('type', ''), t['category'], t.get('subcategory', ''), t.get('shopping_subcategory', ''),
+             t.get('canonical_merchant', ''), int(t.get('is_dd', False)), int(t.get('is_atm', False)),
+             int(t.get('is_refund', False)))
+            for t in txns
+        ]
+        db.run_many(
+            "INSERT INTO transactions (statement_id, account, date, month, txn_desc, amount, dir, type, "
+            "category, subcategory, shopping_subcategory, canonical_merchant, is_dd, is_atm, is_refund) "
+            "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            rows, commit=True,
+        )
 
         return "success", f"{filename}: {account} statement for {summary.month_label(period)} — {len(txns)} transactions added."
 
