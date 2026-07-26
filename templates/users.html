@@ -1,0 +1,45 @@
+{% extends "base_app.html" %}
+{% block content %}
+<h1>Family accounts</h1>
+
+<div class="card">
+  <h2>Add a family member</h2>
+  <form method="post" action="{{ url_for('create_user') }}">
+    <label for="name">Full name</label>
+    <input type="text" id="name" name="name" required>
+    <label for="username">Username</label>
+    <input type="text" id="username" name="username" required>
+    <label for="email">Email (for login codes)</label>
+    <input type="email" id="email" name="email" required>
+    <label for="password">Temporary password</label>
+    <input type="text" id="password" name="password" required minlength="8">
+    <button class="primary" type="submit">Create account</button>
+  </form>
+  <p class="muted">Family members can only view and export reports — they can't upload statements or manage accounts.</p>
+</div>
+
+<div class="card" style="max-width:820px;">
+  <h2>Existing accounts</h2>
+  <table>
+    <tr><th>Name</th><th>Username</th><th>Email</th><th>Role</th><th>Status</th><th></th></tr>
+    {% for u in users %}
+    <tr>
+      <td>{{ u.name }}</td>
+      <td>{{ u.username }}</td>
+      <td>{{ u.email }}</td>
+      <td><span class="pill {{ u.role }}">{{ u.role }}</span></td>
+      <td><span class="pill {{ 'active' if u.is_active else 'inactive' }}">{{ 'active' if u.is_active else 'disabled' }}</span></td>
+      <td>
+        {% if u.role != 'admin' %}
+        <form method="post" action="{{ url_for('toggle_user', user_id=u.id) }}">
+          <button class="linklike" style="color:#1f6feb;text-decoration:underline;background:none;border:none;cursor:pointer;font-size:12.5px;" type="submit">
+            {{ 'Disable' if u.is_active else 'Enable' }}
+          </button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+</div>
+{% endblock %}

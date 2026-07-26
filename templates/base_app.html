@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ page_title or "Household Expense Dashboard" }}</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+         background:#fcfcfb; margin:0; color:#222; }
+  .app-nav { max-width: 1180px; margin: 0 auto; padding: 14px 24px 0; display:flex; flex-wrap:wrap;
+             align-items:center; gap: 14px; }
+  .app-nav .brand { font-weight: 700; font-size: 15px; margin-right: auto; }
+  .app-nav a, .app-nav .who { font-size: 13px; color:#444; text-decoration:none; padding: 6px 10px; border-radius:6px; }
+  .app-nav a:hover { background:#eee; }
+  .app-nav a.active { background:#222; color:#fff; }
+  .app-nav form { display:inline; margin:0; }
+  .app-nav button.linklike { font: inherit; font-size:13px; color:#444; background:none; border:none; cursor:pointer; padding:6px 10px; border-radius:6px; }
+  .app-nav button.linklike:hover { background:#eee; }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 20px 24px 60px; }
+  .card { background:#fff; border:1px solid #e7e7e2; border-radius:12px; padding:20px 22px; margin-bottom:18px; max-width: 640px; }
+  h1 { font-size:20px; margin:0 0 14px; }
+  h2 { font-size:15px; margin:0 0 10px; }
+  label { display:block; font-size: 12.5px; color:#444; margin-bottom:5px; font-weight:600; }
+  input, select { width:100%; box-sizing:border-box; padding:9px 11px; border:1px solid #d7d7d2; border-radius:8px;
+          font-size:14px; margin-bottom:14px; }
+  button.primary { padding:9px 16px; border:none; border-radius:8px; background:#1f6feb; color:#fff;
+           font-size:13.5px; font-weight:600; cursor:pointer; }
+  button.primary:hover { background:#1a5fc4; }
+  table { border-collapse:collapse; width:100%; font-size:13.5px; }
+  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid #eee; }
+  th { color:#666; font-weight:600; font-size:12.5px; }
+  .pill { display:inline-block; padding:2px 8px; border-radius:20px; font-size:11.5px; font-weight:600; }
+  .pill.admin { background:#e6efff; color:#1f4fa8; }
+  .pill.member { background:#f0f0f0; color:#555; }
+  .pill.active { background:#e9f7ec; color:#1e6b34; }
+  .pill.inactive { background:#fdecea; color:#a52117; }
+  .flash { max-width: 1180px; margin: 10px auto 0; padding: 10px 16px; border-radius:8px; font-size: 13.5px; }
+  .flash.error { background:#fdecea; color:#a52117; border:1px solid #f3c3bd; }
+  .flash.success { background:#e9f7ec; color:#1e6b34; border:1px solid #bfe3c8; }
+  .muted { color:#888; font-size:12.5px; }
+  code { background:#f0f0ee; padding:1px 6px; border-radius:4px; font-size:12.5px; }
+</style>
+</head>
+<body>
+<nav class="app-nav">
+  <span class="brand">🏠 Household Expenses</span>
+  {% for key, r in (ranges or {}).items() %}
+  <a href="{{ url_for('dashboard', period=key) }}">{{ r.label }}</a>
+  {% endfor %}
+  {% if user.role == 'admin' %}
+  <a href="{{ url_for('upload_page') }}" class="{{ 'active' if active_page=='upload' else '' }}">Upload statement</a>
+  <a href="{{ url_for('users_page') }}" class="{{ 'active' if active_page=='users' else '' }}">Family accounts</a>
+  {% endif %}
+  <a href="{{ url_for('change_password') }}">Change password</a>
+  <span class="who">{{ user.name }} ({{ user.role }})</span>
+  <form method="post" action="{{ url_for('logout') }}"><button class="linklike" type="submit">Log out</button></form>
+</nav>
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for category, message in messages %}
+  <div class="flash {{ category }}">{{ message }}</div>
+  {% endfor %}
+{% endwith %}
+<div class="wrap">
+{% block content %}{% endblock %}
+</div>
+</body>
+</html>

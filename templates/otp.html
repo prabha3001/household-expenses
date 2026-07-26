@@ -1,0 +1,13 @@
+{% extends "base_auth.html" %}
+{% block content %}
+<h1>Enter your code</h1>
+<p class="lead">We've emailed a 6-digit code to {{ masked_email }}. It expires in 10 minutes.</p>
+<form method="post">
+  <label for="code">One-time code</label>
+  <input type="text" id="code" name="code" inputmode="numeric" pattern="[0-9]*" maxlength="6" required autofocus>
+  <button type="submit">Verify &amp; sign in</button>
+</form>
+<form method="post" action="{{ url_for('resend_otp') }}">
+  <button type="submit" style="background:#eee;color:#333;margin-top:10px;">Resend code</button>
+</form>
+{% endblock %}

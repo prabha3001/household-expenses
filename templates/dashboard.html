@@ -1,0 +1,1208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ page_title }}</title>
+<style>
+  .app-nav { max-width: 1180px; margin: 0 auto; padding: 14px 24px 0; display:flex; flex-wrap:wrap;
+             align-items:center; gap: 14px; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  .app-nav .brand { font-weight: 700; font-size: 15px; margin-right: auto; color:#222; }
+  .app-nav a, .app-nav .who { font-size: 13px; color:#444; text-decoration:none; padding: 6px 10px; border-radius:6px; }
+  .app-nav a:hover { background:#eee; }
+  .app-nav a.active { background:#222; color:#fff; }
+  .app-nav form { display:inline; margin:0; }
+  .app-nav button.linklike { font: inherit; font-size:13px; color:#444; background:none; border:none; cursor:pointer; padding:6px 10px; border-radius:6px; }
+  .app-nav button.linklike:hover { background:#eee; }
+  .flash { max-width: 1180px; margin: 10px auto 0; padding: 10px 16px; border-radius:8px; font-size: 13.5px;
+           font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+  .flash.error { background:#fdecea; color:#a52117; border:1px solid #f3c3bd; }
+  .flash.success { background:#e9f7ec; color:#1e6b34; border:1px solid #bfe3c8; }
+  @media print { .app-nav, .flash { display:none !important; } }
+</style>
+<style>
+  .viz-root {
+    color-scheme: light;
+    --surface-1:      #fcfcfb;
+    --page-plane:     #f9f9f7;
+    --text-primary:   #0b0b0b;
+    --text-secondary: #52514e;
+    --text-muted:     #898781;
+    --gridline:       #e1e0d9;
+    --baseline:       #c3c2b7;
+    --border:         rgba(11,11,11,0.10);
+    --good:           #006300;
+
+    --series-groceries: #2a78d6; /* blue */
+    --series-utility:   #eb6834; /* orange */
+    --series-loans:     #1baf7a; /* aqua */
+    --series-food:      #eda100; /* yellow */
+    --series-other:     #e87ba4; /* magenta */
+    --series-income:    #2a78d6; /* blue */
+    --series-expense:   #e34948; /* red */
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:where(:not([data-theme="light"])) .viz-root {
+      color-scheme: dark;
+      --surface-1:      #1a1a19;
+      --page-plane:     #0d0d0d;
+      --text-primary:   #ffffff;
+      --text-secondary: #c3c2b7;
+      --text-muted:     #898781;
+      --gridline:       #2c2c2a;
+      --baseline:       #383835;
+      --border:         rgba(255,255,255,0.10);
+      --good:           #0ca30c;
+      --series-groceries: #3987e5;
+      --series-utility:   #d95926;
+      --series-loans:     #199e70;
+      --series-food:      #c98500;
+      --series-other:     #d55181;
+      --series-income:    #3987e5;
+      --series-expense:   #e66767;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin:0; padding:0; background: #f9f9f7; }
+  @media (prefers-color-scheme: dark) {
+    html:not([data-theme="light"]) body { background: #0d0d0d; }
+  }
+  html[data-theme="dark"] body { background: #0d0d0d; }
+  .viz-root {
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    color: var(--text-primary);
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 28px 24px 60px;
+  }
+  h1 { font-size: 26px; font-weight: 650; margin: 0 0 4px; }
+  .subtitle { color: var(--text-secondary); font-size: 14px; margin: 0 0 28px; }
+  h2 { font-size: 17px; font-weight: 650; margin: 0 0 4px; }
+  .card-note { color: var(--text-secondary); font-size: 13px; margin: 0 0 16px; max-width: 820px; line-height:1.5;}
+  .card {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px 22px 22px;
+    margin-bottom: 20px;
+  }
+  .kpi-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-bottom: 22px; }
+  .kpi {
+    background: var(--surface-1);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 18px;
+  }
+  .kpi .label { font-size: 12.5px; color: var(--text-secondary); margin-bottom: 6px; }
+  .kpi .value { font-size: 26px; font-weight: 650; }
+  .kpi .sub { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
+  .legend { display:flex; flex-wrap:wrap; gap: 14px; margin: 4px 0 14px; }
+  .legend-item { display:flex; align-items:center; gap:6px; font-size:13px; color: var(--text-secondary); }
+  .legend-swatch { width:10px; height:10px; border-radius:2px; flex-shrink:0; }
+  .legend-line { width:14px; height:2px; border-radius:1px; flex-shrink:0; }
+  svg { display:block; overflow: visible; font-family: inherit; }
+  .axis-label { fill: var(--text-muted); font-size: 11px; }
+  .grid-line { stroke: var(--gridline); stroke-width: 1; }
+  .baseline { stroke: var(--baseline); stroke-width: 1; }
+  .bar-seg { transition: opacity .12s; }
+  .bar-seg:hover, .bar-seg.hover { opacity: 0.78; }
+  .tooltip {
+    position: absolute;
+    pointer-events: none;
+    background: var(--text-primary);
+    color: var(--surface-1);
+    font-size: 12.5px;
+    line-height: 1.5;
+    border-radius: 8px;
+    padding: 9px 12px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.18);
+    opacity: 0;
+    transition: opacity .1s;
+    z-index: 10;
+    max-width: 240px;
+  }
+  .tooltip .t-title { font-weight: 650; margin-bottom: 4px; }
+  .tooltip .t-row { display:flex; justify-content:space-between; gap:14px; }
+  .tooltip .t-val { font-weight: 650; }
+  .chart-wrap { position: relative; }
+  table.datatable { width:100%; border-collapse: collapse; font-size: 13.5px; }
+  table.datatable th { text-align:left; color: var(--text-secondary); font-weight:600; padding: 8px 10px; border-bottom: 1px solid var(--gridline); font-size:12.5px;}
+  table.datatable td { padding: 8px 10px; border-bottom: 1px solid var(--gridline); }
+  table.datatable td.num, table.datatable th.num { text-align:right; font-variant-numeric: tabular-nums; }
+  .two-col { display:grid; grid-template-columns: 1.3fr 1fr; gap: 20px; align-items:start; }
+  .callout {
+    background: color-mix(in srgb, var(--series-other) 10%, var(--surface-1));
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 16px;
+    font-size: 13.5px;
+    line-height: 1.55;
+    color: var(--text-secondary);
+  }
+  .callout strong { color: var(--text-primary); }
+  footer { color: var(--text-muted); font-size: 12px; line-height:1.6; margin-top: 10px; }
+  .dd-grid { display:flex; flex-direction:column; gap: 16px; }
+  .dd-panel { border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px 10px; background: var(--surface-1); }
+  .dd-panel-head { display:flex; justify-content:space-between; align-items:baseline; margin-bottom: 2px; }
+  .dd-panel-month { font-size: 15px; font-weight: 650; color: var(--text-primary); }
+  .dd-panel-total { font-size: 14px; font-weight: 650; color: var(--text-secondary); }
+  .dd-panel-sub { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+  .dd-cat-row { display:flex; flex-wrap:wrap; gap: 8px 18px; margin: 0 0 12px; padding: 9px 12px; background: var(--page-plane); border: 1px solid var(--border); border-radius: 8px; }
+  .dd-cat-item { display:flex; align-items:center; gap: 6px; font-size: 12.5px; color: var(--text-secondary); white-space: nowrap; }
+  .dd-cat-swatch { width: 9px; height: 9px; border-radius: 2px; flex-shrink: 0; }
+  .dd-cat-amt { font-weight: 650; color: var(--text-primary); }
+  @media (max-width: 860px) {
+    .kpi-row { grid-template-columns: repeat(2,1fr); }
+    .two-col { grid-template-columns: 1fr; }
+  }
+  @media print {
+    body { background: #fff; }
+    .viz-root { max-width: none; }
+    .card { break-inside: avoid; page-break-inside: avoid; margin-bottom: 14px; box-shadow: none; }
+    #deepDiveCard { break-inside: auto; page-break-inside: auto; }
+    .dd-panel { break-inside: auto; page-break-inside: auto; }
+    .dd-panel-head, .dd-panel-sub, .dd-cat-row { break-inside: avoid; page-break-inside: avoid; break-after: avoid; page-break-after: avoid; }
+    .kpi-row { break-inside: avoid; page-break-inside: avoid; }
+    a[href]::after { content: ""; }
+  }
+</style>
+</head>
+<body>
+<nav class="app-nav">
+  <span class="brand">🏠 Household Expenses</span>
+  {% for key, r in ranges.items() %}
+  <a href="{{ url_for('dashboard', period=key) }}" class="{{ 'active' if key==period else '' }}">{{ r.label }}</a>
+  {% endfor %}
+  <a href="{{ url_for('pdf_report', period=period) }}">Download PDF</a>
+  {% if user.role == 'admin' %}
+  <a href="{{ url_for('upload_page') }}">Upload statement</a>
+  <a href="{{ url_for('users_page') }}">Family accounts</a>
+  {% endif %}
+  <a href="{{ url_for('change_password') }}">Change password</a>
+  <span class="who">{{ user.name }} ({{ user.role }})</span>
+  <form method="post" action="{{ url_for('logout') }}"><button class="linklike" type="submit">Log out</button></form>
+</nav>
+{% with messages = get_flashed_messages(with_categories=true) %}
+  {% for category, message in messages %}
+  <div class="flash {{ category }}">{{ message }}</div>
+  {% endfor %}
+{% endwith %}
+<div class="viz-root">
+
+  <h1>Household Expense Dashboard</h1>
+  <p class="subtitle">HSBC Current Account · Halifax Current Account · HSBC Credit Card · Barclaycard (Amazon) &nbsp;·&nbsp; {{ period_label }}</p>
+
+  <div class="kpi-row" id="kpiRow"></div>
+
+  <div class="card">
+    <h2>Monthly spend by category</h2>
+    <p class="card-note">Every outgoing transaction across all 4 accounts, categorised and stacked by month. Card purchases are counted once, on the card statement — money paid from a current account to settle a credit-card bill is excluded here so nothing is double-counted (see note at the bottom).</p>
+    <div id="legend-stack" class="legend"></div>
+    <div class="chart-wrap"><svg id="chartStack"></svg><div class="tooltip" id="tipStack"></div></div>
+  </div>
+
+  <div class="card">
+    <h2>Income vs. categorised spend, month by month</h2>
+    <p class="card-note">Income = salary and other genuine money coming into the household (NHS pay, family contributions). Spend = the 5 categories above. The gap between the lines is what's left after known spend — some of it goes to savings, some to the transfers described below.</p>
+    <div id="legend-line" class="legend"></div>
+    <div class="chart-wrap"><svg id="chartLine"></svg><div class="tooltip" id="tipLine"></div></div>
+  </div>
+
+  <div class="card">
+    <h2>Money in vs. money out — HSBC &amp; Halifax current accounts</h2>
+    <p class="card-note">This is gross cash movement through the two bank accounts that actually hold money — every credit and every debit, month by month (salary, transfers, direct debits, card settlements, ATM withdrawals, all of it). It's a different lens from the category chart above: that one shows categorised <em>spend</em>; this one shows the full in/out of the accounts themselves. Credit-card purchases don't appear here directly — only the current-account payment that later settles the card bill does.</p>
+    <div id="legend-ca" class="legend"></div>
+    <div class="chart-wrap"><svg id="chartCA"></svg><div class="tooltip" id="tipCA"></div></div>
+  </div>
+
+  <div class="two-col">
+    <div class="card">
+      <h2>Direct Debits by month <span style="font-weight:400;color:var(--text-secondary);font-size:13px;">— HSBC &amp; Halifax current accounts</span></h2>
+      <p class="card-note">Every transaction the bank itself flags as a Direct Debit (type code "DD" on the statement), stacked by account. These are the recurring, automatic payments — loans, utilities, subscriptions, insurance — that leave the account without you actively initiating them each time.</p>
+      <div id="legend-dd" class="legend"></div>
+      <div class="chart-wrap"><svg id="chartDD"></svg><div class="tooltip" id="tipDD"></div></div>
+    </div>
+    <div class="card">
+      <h2>Top Direct Debit payees</h2>
+      <table class="datatable">
+        <thead><tr><th>Payee</th><th class="num">Total (£)</th></tr></thead>
+        <tbody id="ddTable"></tbody>
+      </table>
+      <p class="card-note" style="margin:10px 0 0;">Note: the largest line, "Halifax (mortgage / housing loan)", is the household's Halifax mortgage payment — a fixed £1,848.30 Direct Debit every month from the HSBC current account. It was previously mistaken for an internal transfer to a Halifax savings account and left out of categorised spend; cross-checking every Halifax current-account statement found no matching credit, confirming it's a real external payment, so it's now counted under "Loans" in every chart on this dashboard.</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>ATM &amp; cash withdrawals by month</h2>
+    <p class="card-note">Every withdrawal the bank's own statement codes as a cash machine transaction (type "ATM" on HSBC, "CPT" on Halifax) — identified from the statement's own transaction-type code, not by guessing from the location name, so a cash machine inside a Tesco or at a Shell garage is correctly counted here rather than under Groceries or Fuel.</p>
+    <div id="legend-atm" class="legend"></div>
+    <div class="chart-wrap"><svg id="chartATM"></svg><div class="tooltip" id="tipATM"></div></div>
+  </div>
+
+  <div class="two-col">
+    <div class="card">
+      <h2>Where the money goes overall</h2>
+      <p class="card-note">Total per category across this period.</p>
+      <div class="chart-wrap"><svg id="chartRank"></svg><div class="tooltip" id="tipRank"></div></div>
+    </div>
+    <div class="card">
+      <div class="callout" id="calloutBox"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>What's inside "Other"</h2>
+    <p class="card-note">"Other" is the biggest slice by far, so it's worth breaking open. This is everything that isn't groceries, a utility bill, a loan repayment, or eating out.</p>
+    <div class="chart-wrap"><svg id="chartOther"></svg><div class="tooltip" id="tipOther"></div></div>
+  </div>
+
+  <div class="card" id="shoppingCard">
+    <h2>What's inside "Shopping &amp; Retail"</h2>
+    <p class="card-note">One more level down: the Shopping &amp; Retail slice of "Other", split out by what was actually bought.</p>
+    <div class="chart-wrap"><svg id="chartShopping"></svg><div class="tooltip" id="tipShopping"></div></div>
+  </div>
+
+  <div class="two-col">
+    <div class="card">
+      <h2>Top 15 payees, this period</h2>
+      <table class="datatable">
+        <thead><tr><th>Payee / merchant</th><th class="num">Total (£)</th></tr></thead>
+        <tbody id="merchantTable"></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h2>Spend by account</h2>
+      <p class="card-note" style="margin-bottom:12px;">How much of the categorised spend actually flowed through each account.</p>
+      <div class="chart-wrap"><svg id="chartAccount"></svg><div class="tooltip" id="tipAccount"></div></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>Monthly spend by card &amp; bank</h2>
+    <p class="card-note">Every categorised, de-duplicated transaction total, month by month, split by which physical card or account it was actually spent on — two debit cards (HSBC and Halifax current accounts) and two credit cards (HSBC and Barclaycard/Amazon). Card-settlement transfers between accounts are excluded so nothing is counted on two cards at once.</p>
+    <div id="legend-cardbank" class="legend"></div>
+    <div class="chart-wrap"><svg id="chartCardBank"></svg><div class="tooltip" id="tipCardBank"></div></div>
+  </div>
+
+  <div class="card" id="deepDiveCard">
+    <h2>Monthly deep dive — total spend by payee, month by month</h2>
+    <p class="card-note">One panel per month. Every transaction is grouped by payee/merchant (the same de-duplicated name used elsewhere in this dashboard) and summed, so a payee charged 5 times in a month appears once, ranked by its <strong>total</strong> for that month — biggest first, coloured by category. This answers "how much did I actually spend on each payee this month", rather than listing every individual line item separately.</p>
+    <div id="legend-deepdive" class="legend"></div>
+    <div id="deepDiveGrid" class="dd-grid"></div>
+  </div>
+
+  <div class="card" id="yearlyCard">
+    <h2>Yearly totals</h2>
+    <p class="card-note" id="yearlyNote">Same 5 categories, totalled by calendar year instead of by month — useful for seeing the shape of a full year at a glance.</p>
+    <div id="legend-yearly" class="legend"></div>
+    <div class="chart-wrap"><svg id="chartYearly"></svg><div class="tooltip" id="tipYearly"></div></div>
+  </div>
+
+  <footer id="methodology"></footer>
+</div>
+
+<script>
+const DATA = {{ data_json | safe }};
+// resolved hex (for computing, since CSS vars aren't readable pre-paint reliably in all contexts)
+const CAT_HEX = {
+  'Groceries': '#2a78d6', 'Utility Bills': '#eb6834', 'Loans': '#1baf7a',
+  'Hotel/Food': '#eda100', 'Other': '#e87ba4',
+};
+const CAT_HEX_DARK = {
+  'Groceries': '#3987e5', 'Utility Bills': '#d95926', 'Loans': '#199e70',
+  'Hotel/Food': '#c98500', 'Other': '#d55181',
+};
+function isDark(){
+  const stamp = document.documentElement.getAttribute('data-theme');
+  if (stamp === 'dark') return true;
+  if (stamp === 'light') return false;
+  return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+}
+function catHex(cat){ return isDark() ? CAT_HEX_DARK[cat] : CAT_HEX[cat]; }
+
+function fmtGBP(n, decimals){
+  decimals = decimals === undefined ? 0 : decimals;
+  return '£' + n.toLocaleString('en-GB', {minimumFractionDigits:decimals, maximumFractionDigits:decimals});
+}
+
+// ---------- KPI row ----------
+function renderKPIs(){
+  const el = document.getElementById('kpiRow');
+  const net = DATA.total_income - DATA.total_spend;
+  const avgSpend = DATA.total_spend / DATA.months.length;
+  const kpis = [
+    {label:`Total income (${DATA.months.length} mo)`, value: fmtGBP(DATA.total_income), sub:'Salary + family contributions'},
+    {label:'Total categorised spend', value: fmtGBP(DATA.total_spend), sub:'Groceries + Utilities + Loans + Hotel/Food + Other'},
+    {label:'Net after known spend', value: fmtGBP(net), sub: net>=0 ? 'Income exceeded categorised spend' : 'Categorised spend exceeded income'},
+    {label:'Avg. monthly spend', value: fmtGBP(avgSpend), sub:`Across ${DATA.months.length} month${DATA.months.length===1?'':'s'}`},
+    {label:'Direct Debits', value: fmtGBP(DATA.total_dd), sub: `${DATA.dd_count} txns · HSBC & Halifax current accounts`},
+    {label:'ATM / cash withdrawals', value: fmtGBP(DATA.total_atm), sub: `${DATA.atm_count} txns · identified by statement type code`},
+  ];
+  kpis.forEach(k=>{
+    const d = document.createElement('div');
+    d.className='kpi';
+    const lab = document.createElement('div'); lab.className='label'; lab.textContent = k.label;
+    const val = document.createElement('div'); val.className='value'; val.textContent = k.value;
+    const sub = document.createElement('div'); sub.className='sub'; sub.textContent = k.sub;
+    d.appendChild(lab); d.appendChild(val); d.appendChild(sub);
+    el.appendChild(d);
+  });
+}
+
+// ---------- Stacked bar: monthly category spend ----------
+function renderLegend(containerId, items){
+  const el = document.getElementById(containerId);
+  items.forEach(it=>{
+    const row = document.createElement('div'); row.className='legend-item';
+    const sw = document.createElement('span');
+    sw.className = it.line ? 'legend-line' : 'legend-swatch';
+    sw.style.background = it.color;
+    const txt = document.createElement('span'); txt.textContent = it.label;
+    row.appendChild(sw); row.appendChild(txt);
+    el.appendChild(row);
+  });
+}
+
+function renderStackedBar(){
+  const svg = document.getElementById('chartStack');
+  const tip = document.getElementById('tipStack');
+  const cats = DATA.categories;
+  renderLegend('legend-stack', cats.map(c=>({label:c, color: catHex(c)})));
+
+  const W = 1080, H = 340;
+  const padL = 56, padR = 16, padT = 16, padB = 34;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('width','100%');
+  svg.setAttribute('height', H);
+
+  const months = DATA.months;
+  const totals = months.map(m => cats.reduce((s,c)=> s + DATA.monthly_category_spend[m][c], 0));
+  const maxVal = Math.max(...totals);
+  const niceMax = Math.ceil(maxVal / 2000) * 2000;
+
+  // gridlines
+  const nTicks = 4;
+  for (let i=0;i<=nTicks;i++){
+    const v = niceMax * i / nTicks;
+    const y = padT + plotH - (v/niceMax)*plotH;
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1', padL); line.setAttribute('x2', W-padR);
+    line.setAttribute('y1', y); line.setAttribute('y2', y);
+    line.setAttribute('class','grid-line');
+    svg.appendChild(line);
+    const lbl = document.createElementNS('http://www.w3.org/2000/svg','text');
+    lbl.setAttribute('x', padL-8); lbl.setAttribute('y', y+4);
+    lbl.setAttribute('text-anchor','end'); lbl.setAttribute('class','axis-label');
+    lbl.textContent = '£' + Math.round(v/1000) + 'k';
+    svg.appendChild(lbl);
+  }
+
+  const bandW = plotW / months.length;
+  const barW = Math.min(40, bandW * 0.6);
+  const gap = 2;
+
+  months.forEach((m, i)=>{
+    const cx = padL + bandW*i + bandW/2;
+    let yCursor = padT + plotH;
+    cats.forEach(cat=>{
+      const val = DATA.monthly_category_spend[m][cat];
+      if (val <= 0) return;
+      const segH = (val/niceMax) * plotH;
+      const y = yCursor - segH;
+      const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+      rect.setAttribute('x', cx - barW/2);
+      rect.setAttribute('y', y);
+      rect.setAttribute('width', barW);
+      rect.setAttribute('height', Math.max(segH - gap, 0));
+      rect.setAttribute('fill', catHex(cat));
+      rect.setAttribute('class','bar-seg');
+      rect.setAttribute('rx', 3);
+      rect.addEventListener('pointermove', (ev)=> showTip(tip, ev, svg, `${DATA.month_labels[i]} — ${cat}`, fmtGBP(val,0)));
+      rect.addEventListener('pointerleave', ()=> hideTip(tip));
+      svg.appendChild(rect);
+      yCursor = y;
+    });
+    const lbl = document.createElementNS('http://www.w3.org/2000/svg','text');
+    lbl.setAttribute('x', cx); lbl.setAttribute('y', H-12);
+    lbl.setAttribute('text-anchor','middle'); lbl.setAttribute('class','axis-label');
+    lbl.textContent = DATA.month_labels[i];
+    svg.appendChild(lbl);
+  });
+
+  const base = document.createElementNS('http://www.w3.org/2000/svg','line');
+  base.setAttribute('x1', padL); base.setAttribute('x2', W-padR);
+  base.setAttribute('y1', padT+plotH); base.setAttribute('y2', padT+plotH);
+  base.setAttribute('class','baseline');
+  svg.appendChild(base);
+}
+
+function showTip(tip, ev, svg, title, valText, rows){
+  tip.innerHTML = '';
+  const t = document.createElement('div'); t.className='t-title'; t.textContent = title;
+  tip.appendChild(t);
+  if (rows){
+    rows.forEach(r=>{
+      const row = document.createElement('div'); row.className='t-row';
+      const l = document.createElement('span'); l.textContent = r.label;
+      const v = document.createElement('span'); v.className='t-val'; v.textContent = r.value;
+      row.appendChild(l); row.appendChild(v);
+      tip.appendChild(row);
+    });
+  } else {
+    const row = document.createElement('div'); row.className='t-row t-val';
+    row.textContent = valText;
+    tip.appendChild(row);
+  }
+  const wrapRect = svg.parentElement.getBoundingClientRect();
+  const x = ev.clientX - wrapRect.left;
+  const y = ev.clientY - wrapRect.top;
+  tip.style.left = Math.min(x+14, wrapRect.width - 240) + 'px';
+  tip.style.top = Math.max(y-10, 0) + 'px';
+  tip.style.opacity = 1;
+}
+function hideTip(tip){ tip.style.opacity = 0; }
+
+// ---------- Line chart: income vs expense ----------
+function renderLineChart(){
+  const svg = document.getElementById('chartLine');
+  const tip = document.getElementById('tipLine');
+  renderLegend('legend-line', [
+    {label:'Income', color: isDark() ? '#3987e5' : '#2a78d6', line:true},
+    {label:'Categorised spend', color: isDark() ? '#e66767' : '#e34948', line:true},
+  ]);
+
+  const W = 1080, H = 300;
+  const padL = 56, padR = 20, padT = 20, padB = 34;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('width','100%'); svg.setAttribute('height', H);
+
+  const months = DATA.months;
+  const incomeVals = months.map(m=>DATA.monthly_income[m]);
+  const spendVals = months.map(m=> DATA.categories.reduce((s,c)=>s+DATA.monthly_category_spend[m][c],0));
+  const maxVal = Math.max(...incomeVals, ...spendVals);
+  const niceMax = Math.ceil(maxVal/2000)*2000;
+
+  for (let i=0;i<=4;i++){
+    const v = niceMax*i/4;
+    const y = padT + plotH - (v/niceMax)*plotH;
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1',padL); line.setAttribute('x2', W-padR);
+    line.setAttribute('y1',y); line.setAttribute('y2',y);
+    line.setAttribute('class','grid-line');
+    svg.appendChild(line);
+    const lbl = document.createElementNS('http://www.w3.org/2000/svg','text');
+    lbl.setAttribute('x', padL-8); lbl.setAttribute('y', y+4);
+    lbl.setAttribute('text-anchor','end'); lbl.setAttribute('class','axis-label');
+    lbl.textContent = '£'+Math.round(v/1000)+'k';
+    svg.appendChild(lbl);
+  }
+
+  const stepX = plotW/(months.length-1);
+  function xy(vals, idx){
+    const x = padL + stepX*idx;
+    const y = padT + plotH - (vals[idx]/niceMax)*plotH;
+    return [x,y];
+  }
+  function drawSeries(vals, color){
+    let d = '';
+    vals.forEach((v,i)=>{
+      const [x,y] = xy(vals,i);
+      d += (i===0? 'M':'L') + x.toFixed(1) + ' ' + y.toFixed(1) + ' ';
+    });
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d', d.trim());
+    path.setAttribute('fill','none');
+    path.setAttribute('stroke', color);
+    path.setAttribute('stroke-width', 2);
+    path.setAttribute('stroke-linejoin','round');
+    path.setAttribute('stroke-linecap','round');
+    svg.appendChild(path);
+    vals.forEach((v,i)=>{
+      const [x,y] = xy(vals,i);
+      const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      c.setAttribute('cx',x); c.setAttribute('cy',y); c.setAttribute('r',4.5);
+      c.setAttribute('fill', color);
+      c.setAttribute('stroke', 'var(--surface-1)');
+      c.setAttribute('stroke-width', 2);
+      svg.appendChild(c);
+    });
+  }
+  drawSeries(incomeVals, isDark() ? '#3987e5' : '#2a78d6');
+  drawSeries(spendVals, isDark() ? '#e66767' : '#e34948');
+
+  // hover hit columns with crosshair
+  months.forEach((m,i)=>{
+    const x = padL + stepX*i;
+    const hit = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    hit.setAttribute('x', x - stepX/2); hit.setAttribute('y', padT);
+    hit.setAttribute('width', stepX); hit.setAttribute('height', plotH);
+    hit.setAttribute('fill','transparent');
+    hit.addEventListener('pointermove',(ev)=>{
+      showTip(tip, ev, svg, DATA.month_labels[i], null, [
+        {label:'Income', value: fmtGBP(incomeVals[i],0)},
+        {label:'Spend', value: fmtGBP(spendVals[i],0)},
+        {label:'Difference', value: fmtGBP(incomeVals[i]-spendVals[i],0)},
+      ]);
+    });
+    hit.addEventListener('pointerleave', ()=>hideTip(tip));
+    svg.appendChild(hit);
+    const lbl = document.createElementNS('http://www.w3.org/2000/svg','text');
+    lbl.setAttribute('x', x); lbl.setAttribute('y', H-12);
+    lbl.setAttribute('text-anchor','middle'); lbl.setAttribute('class','axis-label');
+    lbl.textContent = DATA.month_labels[i];
+    svg.appendChild(lbl);
+  });
+
+  const base = document.createElementNS('http://www.w3.org/2000/svg','line');
+  base.setAttribute('x1',padL); base.setAttribute('x2', W-padR);
+  base.setAttribute('y1', padT+plotH); base.setAttribute('y2', padT+plotH);
+  base.setAttribute('class','baseline');
+  svg.appendChild(base);
+}
+
+// ---------- Horizontal ranked bar (generic) ----------
+function renderHBar(svgId, tipId, items, colorFn, W){
+  const svg = document.getElementById(svgId);
+  const tip = document.getElementById(tipId);
+  W = W || 1080;
+  const rowH = 30, gap = 10;
+  const padL = 190, padR = 90, padT = 8;
+  const H = padT*2 + items.length*(rowH+gap) - gap;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('width','100%'); svg.setAttribute('height', H);
+
+  const maxVal = Math.max(...items.map(it=>it.value));
+  const plotW = W - padL - padR;
+
+  items.forEach((it, i)=>{
+    const y = padT + i*(rowH+gap);
+    const w = (it.value/maxVal) * plotW;
+    const label = document.createElementNS('http://www.w3.org/2000/svg','text');
+    label.setAttribute('x', padL-10); label.setAttribute('y', y+rowH/2+4);
+    label.setAttribute('text-anchor','end'); label.setAttribute('class','axis-label');
+    label.setAttribute('fill','var(--text-secondary)');
+    label.textContent = it.label;
+    svg.appendChild(label);
+
+    const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    rect.setAttribute('x', padL); rect.setAttribute('y', y);
+    rect.setAttribute('width', Math.max(w,3)); rect.setAttribute('height', rowH);
+    rect.setAttribute('rx', 5);
+    rect.setAttribute('fill', colorFn(it, i));
+    rect.setAttribute('class','bar-seg');
+    rect.addEventListener('pointermove',(ev)=> showTip(tip, ev, svg, it.label, fmtGBP(it.value,0)));
+    rect.addEventListener('pointerleave', ()=>hideTip(tip));
+    svg.appendChild(rect);
+
+    const valLbl = document.createElementNS('http://www.w3.org/2000/svg','text');
+    valLbl.setAttribute('x', padL + w + 10); valLbl.setAttribute('y', y+rowH/2+4);
+    valLbl.setAttribute('class','axis-label'); valLbl.setAttribute('fill','var(--text-primary)');
+    valLbl.setAttribute('font-weight','600');
+    valLbl.textContent = fmtGBP(it.value,0);
+    svg.appendChild(valLbl);
+  });
+}
+
+function renderRankChart(){
+  const items = DATA.categories
+    .map(c=>({label:c, value: DATA.category_totals[c]}))
+    .sort((a,b)=>b.value-a.value);
+  renderHBar('chartRank','tipRank', items, (it)=>catHex(it.label));
+}
+
+function renderOtherChart(){
+  const items = Object.entries(DATA.other_subcategory_totals)
+    .map(([k,v])=>({label:k, value:v}))
+    .sort((a,b)=>b.value-a.value);
+  renderHBar('chartOther','tipOther', items, ()=>catHex('Other'));
+}
+
+function renderShoppingChart(){
+  const data = DATA.shopping_subcategory_totals || {};
+  const items = Object.entries(data)
+    .map(([k,v])=>({label:k, value:v}))
+    .sort((a,b)=>b.value-a.value);
+  const card = document.getElementById('shoppingCard');
+  if (items.length === 0){ card.style.display = 'none'; return; }
+  renderHBar('chartShopping','tipShopping', items, ()=>catHex('Other'));
+}
+
+function renderAccountChart(){
+  const items = Object.entries(DATA.account_totals)
+    .map(([k,v])=>({label:k, value:v}))
+    .sort((a,b)=>b.value-a.value);
+  renderHBar('chartAccount','tipAccount', items, ()=> (isDark() ? '#5598e7' : '#2a78d6'), 560);
+}
+
+// ---------- Monthly spend by card & bank (multi-line) ----------
+const CARD_LABEL = {
+  'HSBC Current Account': 'HSBC Debit Card (current a/c)',
+  'Halifax Current Account': 'Halifax Debit Card (current a/c)',
+  'HSBC Credit Card': 'HSBC Credit Card',
+  'Barclaycard': 'Barclaycard (Amazon) Credit Card',
+};
+const CARD_HEX = {
+  'HSBC Current Account': '#2a78d6',
+  'Halifax Current Account': '#1baf7a',
+  'HSBC Credit Card': '#eb6834',
+  'Barclaycard': '#e87ba4',
+};
+const CARD_HEX_DARK = {
+  'HSBC Current Account': '#3987e5',
+  'Halifax Current Account': '#199e70',
+  'HSBC Credit Card': '#d95926',
+  'Barclaycard': '#d55181',
+};
+function cardHex(acc){ return isDark() ? CARD_HEX_DARK[acc] : CARD_HEX[acc]; }
+
+function renderCardBankChart(){
+  const svg = document.getElementById('chartCardBank');
+  const tip = document.getElementById('tipCardBank');
+  const accounts = ['HSBC Current Account','Halifax Current Account','HSBC Credit Card','Barclaycard']
+    .filter(a => DATA.account_totals[a] !== undefined);
+  renderLegend('legend-cardbank', accounts.map(a=>({label: CARD_LABEL[a]||a, color: cardHex(a), line:true})));
+
+  const W = 1080, H = 320;
+  const padL = 56, padR = 20, padT = 20, padB = 34;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('width','100%'); svg.setAttribute('height', H);
+
+  const months = DATA.months;
+  const seriesByAcc = {};
+  accounts.forEach(a=>{
+    seriesByAcc[a] = months.map(m => (DATA.monthly_account_spend[m] && DATA.monthly_account_spend[m][a]) || 0);
+  });
+  const maxVal = Math.max(...accounts.flatMap(a=>seriesByAcc[a]), 1);
+  const niceMax = Math.ceil(maxVal/1000)*1000;
+
+  for (let i=0;i<=4;i++){
+    const v = niceMax*i/4;
+    const y = padT + plotH - (v/niceMax)*plotH;
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1',padL); line.setAttribute('x2', W-padR);
+    line.setAttribute('y1',y); line.setAttribute('y2',y);
+    line.setAttribute('class','grid-line');
+    svg.appendChild(line);
+    const lbl = document.createElementNS('http://www.w3.org/2000/svg','text');
+    lbl.setAttribute('x', padL-8); lbl.setAttribute('y', y+4);
+    lbl.setAttribute('text-anchor','end'); lbl.setAttribute('class','axis-label');
+    lbl.textContent = '£'+Math.round(v/1000*10)/10+'k';
+    svg.appendChild(lbl);
+  }
+
+  const stepX = plotW/(months.length-1);
+  function xy(vals, idx){
+    const x = padL + stepX*idx;
+    const y = padT + plotH - (vals[idx]/niceMax)*plotH;
+    return [x,y];
+  }
+  function drawSeries(vals, color){
+    let d = '';
+    vals.forEach((v,i)=>{
+      const [x,y] = xy(vals,i);
+      d += (i===0? 'M':'L') + x.toFixed(1) + ' ' + y.toFixed(1) + ' ';
+    });
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d', d.trim());
+    path.setAttribute('fill','none');
+    path.setAttribute('stroke', color);
+    path.setAttribute('stroke-width', 2);
+    path.setAttribute('stroke-linejoin','round');
+    path.setAttribute('stroke-linecap','round');
+    svg.appendChild(path);
+    vals.forEach((v,i)=>{
+      const [x,y] = xy(vals,i);
+      const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      c.setAttribute('cx',x); c.setAttribute('cy',y); c.setAttribute('r',4);
+      c.setAttribute('fill', color);
+      c.setAttribute('stroke', 'var(--surface-1)');
+      c.setAttribute('stroke-width', 1.5);
+      svg.appendChild(c);
+    });
+  }
+  accounts.forEach(a => drawSeries(seriesByAcc[a], cardHex(a)));
+
+  months.forEach((m,i)=>{
+    const x = padL + stepX*i;
+    const hit = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    hit.setAttribute('x', x - stepX/2); hit.setAttribute('y', padT);
+    hit.setAttribute('width', stepX); hit.setAttribute('height', plotH);
+    hit.setAttribute('fill','transparent');
+    hit.addEventListener('pointermove',(ev)=>{
+      showTip(tip, ev, svg, DATA.month_labels[i], null,
+        accounts.map(a=>({label: CARD_LABEL[a]||a, value: fmtGBP(seriesByAcc[a][i],0)})));
+    });
+    hit.addEventListener('pointerleave', ()=>hideTip(tip));
+    svg.appendChild(hit);
+    const lbl = document.createElementNS('http://www.w3.org/2000/svg','text');
+    lbl.setAttribute('x', x); lbl.setAttribute('y', H-12);
+    lbl.setAttribute('text-anchor','middle'); lbl.setAttribute('class','axis-label');
+    lbl.textContent = DATA.month_labels[i];
+    svg.appendChild(lbl);
+  });
+
+  const base = document.createElementNS('http://www.w3.org/2000/svg','line');
+  base.setAttribute('x1',padL); base.setAttribute('x2', W-padR);
+  base.setAttribute('y1', padT+plotH); base.setAttribute('y2', padT+plotH);
+  base.setAttribute('class','baseline');
+  svg.appendChild(base);
+}
+
+// ---------- Monthly deep-dive: one full-width panel per month, ranked by payee total ----------
+function renderMonthDeepDive(){
+  const container = document.getElementById('deepDiveGrid');
+  container.innerHTML = '';
+  const cats = DATA.categories;
+  renderLegend('legend-deepdive', cats.map(c=>({label:c, color: catHex(c)})));
+
+  const detail = DATA.txn_detail || [];
+  const months = DATA.months;
+  const byMonth = {};
+  months.forEach(m=> byMonth[m] = []);
+  detail.forEach(t=>{ if (byMonth[t.m]) byMonth[t.m].push(t); });
+
+  const monthTotal = {};
+  months.forEach(m=>{
+    monthTotal[m] = cats.reduce((s,c)=> s + (DATA.monthly_category_spend[m][c]||0), 0);
+  });
+
+  const W = 1080;
+  const padL = 300, padR = 80, padT = 6, padB = 6;
+  const rowH = 16, rowGap = 3;
+  const plotW = W - padL - padR;
+
+  months.forEach((m, mi)=>{
+    // group this month's transactions by payee/merchant and sum
+    const byPayee = {};
+    (byMonth[m]||[]).forEach(t=>{
+      if (!byPayee[t.l]) byPayee[t.l] = { name: t.l, total: 0, count: 0, cats: {} };
+      byPayee[t.l].total += t.a;
+      byPayee[t.l].count += 1;
+      byPayee[t.l].cats[t.c] = (byPayee[t.l].cats[t.c]||0) + t.a;
+    });
+    const items = Object.values(byPayee).map(p=>{
+      // colour by whichever category makes up most of this payee's spend
+      const topCat = Object.entries(p.cats).sort((a,b)=>b[1]-a[1])[0][0];
+      return { ...p, cat: topCat };
+    }).sort((a,b)=> b.total - a.total);
+
+    const panel = document.createElement('div');
+    panel.className = 'dd-panel';
+
+    const head = document.createElement('div'); head.className = 'dd-panel-head';
+    const monthLbl = document.createElement('div'); monthLbl.className='dd-panel-month'; monthLbl.textContent = DATA.month_labels[mi];
+    const totalLbl = document.createElement('div'); totalLbl.className='dd-panel-total'; totalLbl.textContent = `Total: ${fmtGBP(monthTotal[m],0)}`;
+    head.appendChild(monthLbl); head.appendChild(totalLbl);
+    panel.appendChild(head);
+
+    const rawCount = (byMonth[m]||[]).length;
+    const sub = document.createElement('div'); sub.className='dd-panel-sub';
+    sub.textContent = `${items.length} unique payee${items.length===1?'':'s'} (from ${rawCount} raw transaction${rawCount===1?'':'s'} — repeat charges to the same payee are summed into one bar)`;
+    panel.appendChild(sub);
+
+    // category-totals summary row for this month (label + amount per category, plus grand total)
+    const catRow = document.createElement('div'); catRow.className = 'dd-cat-row';
+    cats.forEach(c=>{
+      const val = (DATA.monthly_category_spend[m] && DATA.monthly_category_spend[m][c]) || 0;
+      const item = document.createElement('div'); item.className = 'dd-cat-item';
+      const sw = document.createElement('span'); sw.className = 'dd-cat-swatch'; sw.style.background = catHex(c);
+      const txt = document.createElement('span'); txt.textContent = c + ': ';
+      const amt = document.createElement('span'); amt.className = 'dd-cat-amt'; amt.textContent = fmtGBP(val,0);
+      item.appendChild(sw); item.appendChild(txt); item.appendChild(amt);
+      catRow.appendChild(item);
+    });
+    const totalItem = document.createElement('div'); totalItem.className = 'dd-cat-item';
+    const totalTxt = document.createElement('span'); totalTxt.innerHTML = '<strong>Month total: </strong>';
+    const totalAmt = document.createElement('span'); totalAmt.className = 'dd-cat-amt'; totalAmt.textContent = fmtGBP(monthTotal[m],0);
+    totalItem.appendChild(totalTxt); totalItem.appendChild(totalAmt);
+    catRow.appendChild(totalItem);
+    panel.appendChild(catRow);
+
+    const wrap = document.createElement('div'); wrap.className = 'chart-wrap';
+    const H = padT + padB + Math.max(items.length,1)*(rowH+rowGap);
+    const svg = document.createElementNS('http://www.w3.org/2000/svg','svg');
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.setAttribute('width','100%'); svg.setAttribute('height', H);
+    const tip = document.createElement('div'); tip.className='tooltip';
+    wrap.appendChild(svg); wrap.appendChild(tip);
+    panel.appendChild(wrap);
+    container.appendChild(panel);
+
+    const maxVal = Math.max(...items.map(it=>Math.abs(it.total)), 1);
+    items.forEach((it,i)=>{
+      const y = padT + i*(rowH+rowGap);
+      const isRefund = it.total < 0;
+      const w = (Math.abs(it.total)/maxVal) * plotW;
+
+      const label = document.createElementNS('http://www.w3.org/2000/svg','text');
+      label.setAttribute('x', padL-8); label.setAttribute('y', y+rowH/2+4);
+      label.setAttribute('text-anchor','end'); label.setAttribute('class','axis-label');
+      label.setAttribute('fill', isRefund ? 'var(--text-muted)' : 'var(--text-secondary)');
+      label.textContent = it.name.length>38 ? it.name.slice(0,38)+'…' : it.name;
+      svg.appendChild(label);
+
+      const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+      rect.setAttribute('x', padL); rect.setAttribute('y', y);
+      rect.setAttribute('width', Math.max(w,2)); rect.setAttribute('height', rowH);
+      rect.setAttribute('rx', 3);
+      if (isRefund){
+        rect.setAttribute('fill', 'none');
+        rect.setAttribute('stroke', 'var(--text-muted)');
+        rect.setAttribute('stroke-width', 1.5);
+        rect.setAttribute('stroke-dasharray', '3,2');
+      } else {
+        rect.setAttribute('fill', catHex(it.cat));
+        rect.setAttribute('fill-opacity', 0.88);
+      }
+      rect.style.cursor = 'pointer';
+      rect.addEventListener('pointermove', (ev)=>{
+        showTip(tip, ev, svg, it.name, null, [
+          {label:'Category', value: it.cat},
+          {label:'This month', value: fmtGBP(it.total,2)},
+          {label:'Transactions', value: String(it.count)},
+          ...(isRefund ? [{label:'Type', value:'Refund / dispute credit — netted against spend'}] : []),
+        ]);
+      });
+      rect.addEventListener('pointerleave', ()=> hideTip(tip));
+      svg.appendChild(rect);
+
+      const valLbl = document.createElementNS('http://www.w3.org/2000/svg','text');
+      valLbl.setAttribute('x', padL+w+8); valLbl.setAttribute('y', y+rowH/2+4);
+      valLbl.setAttribute('class','axis-label');
+      valLbl.setAttribute('fill', isRefund ? 'var(--text-muted)' : 'var(--text-primary)');
+      valLbl.textContent = fmtGBP(it.total,0) + (it.count>1 ? ` (×${it.count})` : '');
+      svg.appendChild(valLbl);
+    });
+  });
+}
+
+// ---------- account colour helper (HSBC vs Halifax current accounts) ----------
+const ACC_HEX = { 'HSBC Current Account': '#2a78d6', 'Halifax Current Account': '#1baf7a' };
+const ACC_HEX_DARK = { 'HSBC Current Account': '#3987e5', 'Halifax Current Account': '#199e70' };
+function accHex(acc){ return isDark() ? ACC_HEX_DARK[acc] : ACC_HEX[acc]; }
+const ACC_SHORT = { 'HSBC Current Account': 'HSBC CA', 'Halifax Current Account': 'Halifax CA' };
+
+// ---------- Money in vs. out — current accounts (line chart) ----------
+function renderCAChart(){
+  const svg = document.getElementById('chartCA');
+  const tip = document.getElementById('tipCA');
+  renderLegend('legend-ca', [
+    {label:'Money in', color: isDark() ? '#3987e5' : '#2a78d6', line:true},
+    {label:'Money out', color: isDark() ? '#e66767' : '#e34948', line:true},
+  ]);
+
+  const W = 1080, H = 300;
+  const padL = 56, padR = 20, padT = 20, padB = 34;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('width','100%'); svg.setAttribute('height', H);
+
+  const months = DATA.months;
+  const inVals = months.map(m=>DATA.monthly_ca_in[m]);
+  const outVals = months.map(m=>DATA.monthly_ca_out[m]);
+  const maxVal = Math.max(...inVals, ...outVals);
+  const niceMax = Math.ceil(maxVal/2000)*2000;
+
+  for (let i=0;i<=4;i++){
+    const v = niceMax*i/4;
+    const y = padT + plotH - (v/niceMax)*plotH;
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1',padL); line.setAttribute('x2', W-padR);
+    line.setAttribute('y1',y); line.setAttribute('y2',y);
+    line.setAttribute('class','grid-line');
+    svg.appendChild(line);
+    const lbl = document.createElementNS('http://www.w3.org/2000/svg','text');
+    lbl.setAttribute('x', padL-8); lbl.setAttribute('y', y+4);
+    lbl.setAttribute('text-anchor','end'); lbl.setAttribute('class','axis-label');
+    lbl.textContent = '£'+Math.round(v/1000)+'k';
+    svg.appendChild(lbl);
+  }
+
+  const stepX = plotW/(months.length-1);
+  function xy(vals, idx){
+    const x = padL + stepX*idx;
+    const y = padT + plotH - (vals[idx]/niceMax)*plotH;
+    return [x,y];
+  }
+  function drawSeries(vals, color){
+    let d = '';
+    vals.forEach((v,i)=>{
+      const [x,y] = xy(vals,i);
+      d += (i===0? 'M':'L') + x.toFixed(1) + ' ' + y.toFixed(1) + ' ';
+    });
+    const path = document.createElementNS('http://www.w3.org/2000/svg','path');
+    path.setAttribute('d', d.trim());
+    path.setAttribute('fill','none');
+    path.setAttribute('stroke', color);
+    path.setAttribute('stroke-width', 2);
+    path.setAttribute('stroke-linejoin','round');
+    path.setAttribute('stroke-linecap','round');
+    svg.appendChild(path);
+    vals.forEach((v,i)=>{
+      const [x,y] = xy(vals,i);
+      const c = document.createElementNS('http://www.w3.org/2000/svg','circle');
+      c.setAttribute('cx',x); c.setAttribute('cy',y); c.setAttribute('r',4.5);
+      c.setAttribute('fill', color);
+      c.setAttribute('stroke', 'var(--surface-1)');
+      c.setAttribute('stroke-width', 2);
+      svg.appendChild(c);
+    });
+  }
+  drawSeries(inVals, isDark() ? '#3987e5' : '#2a78d6');
+  drawSeries(outVals, isDark() ? '#e66767' : '#e34948');
+
+  months.forEach((m,i)=>{
+    const x = padL + stepX*i;
+    const hit = document.createElementNS('http://www.w3.org/2000/svg','rect');
+    hit.setAttribute('x', x - stepX/2); hit.setAttribute('y', padT);
+    hit.setAttribute('width', stepX); hit.setAttribute('height', plotH);
+    hit.setAttribute('fill','transparent');
+    hit.addEventListener('pointermove',(ev)=>{
+      showTip(tip, ev, svg, DATA.month_labels[i], null, [
+        {label:'Money in', value: fmtGBP(inVals[i],0)},
+        {label:'Money out', value: fmtGBP(outVals[i],0)},
+        {label:'Net', value: fmtGBP(inVals[i]-outVals[i],0)},
+      ]);
+    });
+    hit.addEventListener('pointerleave', ()=>hideTip(tip));
+    svg.appendChild(hit);
+    const lbl = document.createElementNS('http://www.w3.org/2000/svg','text');
+    lbl.setAttribute('x', x); lbl.setAttribute('y', H-12);
+    lbl.setAttribute('text-anchor','middle'); lbl.setAttribute('class','axis-label');
+    lbl.textContent = DATA.month_labels[i];
+    svg.appendChild(lbl);
+  });
+
+  const base = document.createElementNS('http://www.w3.org/2000/svg','line');
+  base.setAttribute('x1',padL); base.setAttribute('x2', W-padR);
+  base.setAttribute('y1', padT+plotH); base.setAttribute('y2', padT+plotH);
+  base.setAttribute('class','baseline');
+  svg.appendChild(base);
+}
+
+// ---------- generic stacked bar by account, keyed by a set of x-axis buckets ----------
+function renderAccountStackedBar(svgId, tipId, legendId, buckets, bucketLabels, dataByBucket, accounts, unitNote){
+  const svg = document.getElementById(svgId);
+  const tip = document.getElementById(tipId);
+  renderLegend(legendId, accounts.map(a=>({label: ACC_SHORT[a] || a, color: accHex(a)})));
+
+  const W = 1080, H = 300;
+  const padL = 56, padR = 16, padT = 16, padB = 34;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('width','100%');
+  svg.setAttribute('height', H);
+
+  const totals = buckets.map(b => accounts.reduce((s,a)=> s + (dataByBucket[b][a]||0), 0));
+  const maxVal = Math.max(...totals, 1);
+  const niceMax = Math.ceil(maxVal / 200) * 200 || 200;
+
+  const nTicks = 4;
+  for (let i=0;i<=nTicks;i++){
+    const v = niceMax * i / nTicks;
+    const y = padT + plotH - (v/niceMax)*plotH;
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1', padL); line.setAttribute('x2', W-padR);
+    line.setAttribute('y1', y); line.setAttribute('y2', y);
+    line.setAttribute('class','grid-line');
+    svg.appendChild(line);
+    const lbl = document.createElementNS('http://www.w3.org/2000/svg','text');
+    lbl.setAttribute('x', padL-8); lbl.setAttribute('y', y+4);
+    lbl.setAttribute('text-anchor','end'); lbl.setAttribute('class','axis-label');
+    lbl.textContent = fmtGBP(v,0);
+    svg.appendChild(lbl);
+  }
+
+  const bandW = plotW / buckets.length;
+  const barW = Math.min(40, bandW * 0.6);
+  const gap = 2;
+
+  buckets.forEach((b, i)=>{
+    const cx = padL + bandW*i + bandW/2;
+    let yCursor = padT + plotH;
+    accounts.forEach(acc=>{
+      const val = dataByBucket[b][acc] || 0;
+      if (val <= 0) return;
+      const segH = (val/niceMax) * plotH;
+      const y = yCursor - segH;
+      const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+      rect.setAttribute('x', cx - barW/2);
+      rect.setAttribute('y', y);
+      rect.setAttribute('width', barW);
+      rect.setAttribute('height', Math.max(segH - gap, 0));
+      rect.setAttribute('fill', accHex(acc));
+      rect.setAttribute('class','bar-seg');
+      rect.setAttribute('rx', 3);
+      rect.addEventListener('pointermove', (ev)=> showTip(tip, ev, svg, `${bucketLabels[i]} — ${ACC_SHORT[acc]||acc}`, fmtGBP(val,0)));
+      rect.addEventListener('pointerleave', ()=> hideTip(tip));
+      svg.appendChild(rect);
+      yCursor = y;
+    });
+    const lbl = document.createElementNS('http://www.w3.org/2000/svg','text');
+    lbl.setAttribute('x', cx); lbl.setAttribute('y', H-12);
+    lbl.setAttribute('text-anchor','middle'); lbl.setAttribute('class','axis-label');
+    lbl.textContent = bucketLabels[i];
+    svg.appendChild(lbl);
+  });
+
+  const base = document.createElementNS('http://www.w3.org/2000/svg','line');
+  base.setAttribute('x1', padL); base.setAttribute('x2', W-padR);
+  base.setAttribute('y1', padT+plotH); base.setAttribute('y2', padT+plotH);
+  base.setAttribute('class','baseline');
+  svg.appendChild(base);
+}
+
+function renderDDChart(){
+  const accounts = Object.keys(ACC_HEX);
+  renderAccountStackedBar('chartDD','tipDD','legend-dd', DATA.months, DATA.month_labels, DATA.monthly_dd_total, accounts);
+}
+
+function renderDDTable(){
+  const tbody = document.getElementById('ddTable');
+  (DATA.dd_top_payees||[]).forEach(([name,val])=>{
+    const tr = document.createElement('tr');
+    const td1 = document.createElement('td'); td1.textContent = name;
+    const td2 = document.createElement('td'); td2.className='num'; td2.textContent = fmtGBP(val,2);
+    tr.appendChild(td1); tr.appendChild(td2);
+    tbody.appendChild(tr);
+  });
+}
+
+function renderATMChart(){
+  const accounts = Object.keys(ACC_HEX);
+  renderAccountStackedBar('chartATM','tipATM','legend-atm', DATA.months, DATA.month_labels, DATA.monthly_atm_total, accounts);
+}
+
+function renderYearlyChart(){
+  const years = DATA.years || [];
+  const card = document.getElementById('yearlyCard');
+  if (years.length < 2){
+    // Not enough distinct calendar years in this range for a year-over-year
+    // comparison — show the single-period totals as a simple ranked bar instead.
+    document.getElementById('yearlyNote').textContent = `This date range sits inside a single period (${(DATA.year_labels||[])[0]||''}), so there's no year-over-year comparison to draw — see "Where the money goes overall" above for the category breakdown, and the KPI row for the headline total.`;
+    card.style.display = 'none';
+    return;
+  }
+  renderLegend('legend-yearly', DATA.categories.map(c=>({label:c, color: catHex(c)})));
+  const svg = document.getElementById('chartYearly');
+  const tip = document.getElementById('tipYearly');
+  const W = 1080, H = 260;
+  const padL = 56, padR = 16, padT = 16, padB = 34;
+  const plotW = W - padL - padR, plotH = H - padT - padB;
+  svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+  svg.setAttribute('width','100%'); svg.setAttribute('height', H);
+
+  const cats = DATA.categories;
+  const totals = years.map(y => cats.reduce((s,c)=> s + DATA.yearly_category_spend[y][c], 0));
+  const maxVal = Math.max(...totals);
+  const niceMax = Math.ceil(maxVal/5000)*5000;
+
+  for (let i=0;i<=4;i++){
+    const v = niceMax*i/4;
+    const y = padT + plotH - (v/niceMax)*plotH;
+    const line = document.createElementNS('http://www.w3.org/2000/svg','line');
+    line.setAttribute('x1',padL); line.setAttribute('x2', W-padR);
+    line.setAttribute('y1',y); line.setAttribute('y2',y);
+    line.setAttribute('class','grid-line');
+    svg.appendChild(line);
+    const lbl = document.createElementNS('http://www.w3.org/2000/svg','text');
+    lbl.setAttribute('x', padL-8); lbl.setAttribute('y', y+4);
+    lbl.setAttribute('text-anchor','end'); lbl.setAttribute('class','axis-label');
+    lbl.textContent = '£'+Math.round(v/1000)+'k';
+    svg.appendChild(lbl);
+  }
+
+  const bandW = plotW / years.length;
+  const barW = Math.min(120, bandW * 0.45);
+  const gap = 2;
+  years.forEach((y,i)=>{
+    const cx = padL + bandW*i + bandW/2;
+    let yCursor = padT + plotH;
+    cats.forEach(cat=>{
+      const val = DATA.yearly_category_spend[y][cat];
+      if (val <= 0) return;
+      const segH = (val/niceMax) * plotH;
+      const yPos = yCursor - segH;
+      const rect = document.createElementNS('http://www.w3.org/2000/svg','rect');
+      rect.setAttribute('x', cx - barW/2);
+      rect.setAttribute('y', yPos);
+      rect.setAttribute('width', barW);
+      rect.setAttribute('height', Math.max(segH-gap,0));
+      rect.setAttribute('fill', catHex(cat));
+      rect.setAttribute('class','bar-seg');
+      rect.setAttribute('rx', 3);
+      rect.addEventListener('pointermove',(ev)=> showTip(tip, ev, svg, `${DATA.year_labels[i]} — ${cat}`, fmtGBP(val,0)));
+      rect.addEventListener('pointerleave', ()=>hideTip(tip));
+      svg.appendChild(rect);
+      yCursor = yPos;
+    });
+    const lbl = document.createElementNS('http://www.w3.org/2000/svg','text');
+    lbl.setAttribute('x', cx); lbl.setAttribute('y', H-12);
+    lbl.setAttribute('text-anchor','middle'); lbl.setAttribute('class','axis-label');
+    lbl.textContent = DATA.year_labels[i];
+    svg.appendChild(lbl);
+  });
+
+  const base = document.createElementNS('http://www.w3.org/2000/svg','line');
+  base.setAttribute('x1',padL); base.setAttribute('x2', W-padR);
+  base.setAttribute('y1', padT+plotH); base.setAttribute('y2', padT+plotH);
+  base.setAttribute('class','baseline');
+  svg.appendChild(base);
+}
+
+function renderMerchantTable(){
+  const tbody = document.getElementById('merchantTable');
+  DATA.top_merchants.slice(0,15).forEach(([name,val])=>{
+    const tr = document.createElement('tr');
+    const td1 = document.createElement('td'); td1.textContent = name;
+    const td2 = document.createElement('td'); td2.className='num'; td2.textContent = fmtGBP(val,2);
+    tr.appendChild(td1); tr.appendChild(td2);
+    tbody.appendChild(tr);
+  });
+}
+
+function renderCallout(){
+  const el = document.getElementById('calloutBox');
+  const otherPct = Math.round(DATA.category_totals['Other'] / DATA.total_spend * 100);
+  const famPct = Math.round(DATA.other_subcategory_totals['Family Transfers & Remittances'] / DATA.total_spend * 100);
+  el.innerHTML = '';
+  const p1 = document.createElement('p');
+  p1.style.margin = '0 0 10px';
+  p1.innerHTML = `<strong>"Other" is ${otherPct}% of all categorised spend</strong> — by far the largest slice, well ahead of Loans (${Math.round(DATA.category_totals['Loans']/DATA.total_spend*100)}%), Groceries (${Math.round(DATA.category_totals['Groceries']/DATA.total_spend*100)}%) and Utility Bills (${Math.round(DATA.category_totals['Utility Bills']/DATA.total_spend*100)}%).`;
+  const p2 = document.createElement('p');
+  p2.style.margin = '0';
+  p2.innerHTML = `Almost all of that is one thing: <strong>family transfers and remittances</strong> (Remitly + payments to named individuals) make up ${famPct}% of total spend on their own — more than groceries, utilities, and dining out combined. If you're trying to find "where the money goes", this is it.`;
+  el.appendChild(p1); el.appendChild(p2);
+}
+
+function renderMethodology(){
+  const el = document.getElementById('methodology');
+  el.innerHTML = `<strong>Methodology.</strong> ${fmtGBP(DATA.total_excluded,0)} in transfers were deliberately left out of the category charts: payments from a current account that settle the HSBC or Barclaycard credit-card bill (the underlying purchases are already counted once, on the card statement), plus money moving between the household's own accounts under the account holder's name. Counting those as well would double-count spend that's already in the categories above. "Loans" covers HSBC PLC Loans, Creation.co.uk / "Your Plan Card Pay", Barclays Partner Finance, and the Halifax mortgage/housing-loan Direct Debit (£1,848.30/month from the HSBC current account — confirmed as a real external payment, not an internal transfer, since no matching credit appears on any Halifax statement). Two genuine merchant refunds / dispute credits on the HSBC Credit Card (£902.40 and £158.50 — shown as dashed "(refund)" bars in the monthly deep dive) are netted back against the category the original purchase was in, rather than excluded, so a purchase that was later reversed isn't still counted as spend. Direct Debits and ATM/cash withdrawals are identified from each statement's own transaction-type code (e.g. "DD", "ATM" on HSBC; "DD", "CPT" on Halifax) rather than by guessing from the merchant name, so they're accurate even when a cash withdrawal happens at a supermarket or garage. The "Money in vs. money out" chart and the top-payee tables use a canonicalised merchant name — the same real payee (a supermarket, a family member, a recurring biller) is merged across its different raw statement spellings, store codes and reference-number suffixes so it isn't double-listed. ${DATA.months.length} monthly statement${DATA.months.length===1?"":"s"} ${DATA.months.length===1?"is":"are"} included in this view (${DATA.month_labels[0]} – ${DATA.month_labels[DATA.month_labels.length-1]}), cross-checked line-by-line against each statement's own opening/closing balance or payments-in/payments-out summary.`;
+}
+
+renderKPIs();
+renderStackedBar();
+renderLineChart();
+renderCAChart();
+renderDDChart();
+renderDDTable();
+renderATMChart();
+renderRankChart();
+renderCallout();
+renderOtherChart();
+renderShoppingChart();
+renderMerchantTable();
+renderAccountChart();
+renderCardBankChart();
+renderMonthDeepDive();
+renderYearlyChart();
+renderMethodology();
+
+window.addEventListener('resize', ()=>{}); // svg uses viewBox scaling, no-op
+</script>
+</body>
+</html>

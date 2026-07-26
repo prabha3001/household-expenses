@@ -1,0 +1,13 @@
+{% extends "base_auth.html" %}
+{% block content %}
+<h1>🏠 Household Expenses</h1>
+<p class="lead">Sign in to view or manage the family expense dashboard.</p>
+<form method="post">
+  <label for="username">Username</label>
+  <input type="text" id="username" name="username" required autofocus autocomplete="username">
+  <label for="password">Password</label>
+  <input type="password" id="password" name="password" required autocomplete="current-password">
+  <button type="submit">Continue</button>
+</form>
+<p class="muted">You'll be asked to enter a one-time code emailed to you next.</p>
+{% endblock %}

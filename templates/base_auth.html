@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ page_title or "Household Expense Dashboard" }}</title>
+<style>
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+         background:#f6f6f4; margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center; }
+  .box { background:#fff; border:1px solid #e4e4e0; border-radius:14px; padding:34px 34px 28px; width: 360px;
+         box-shadow: 0 1px 3px rgba(0,0,0,.05); }
+  h1 { font-size: 19px; margin: 0 0 4px; }
+  p.lead { color:#666; font-size:13px; margin: 0 0 20px; }
+  label { display:block; font-size: 12.5px; color:#444; margin-bottom:5px; font-weight:600; }
+  input { width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #d7d7d2; border-radius:8px;
+          font-size:14px; margin-bottom:16px; }
+  input:focus { outline:2px solid #2a78d6; outline-offset:-1px; }
+  button { width:100%; padding:11px; border:none; border-radius:8px; background:#1f6feb; color:#fff;
+           font-size:14px; font-weight:600; cursor:pointer; }
+  button:hover { background:#1a5fc4; }
+  .flash { padding:10px 12px; border-radius:8px; font-size:13px; margin-bottom:16px; }
+  .flash.error { background:#fdecea; color:#a52117; border:1px solid #f3c3bd; }
+  .flash.success { background:#e9f7ec; color:#1e6b34; border:1px solid #bfe3c8; }
+  .muted { color:#888; font-size:12px; margin-top:14px; text-align:center; }
+</style>
+</head>
+<body>
+<div class="box">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+    <div class="flash {{ category }}">{{ message }}</div>
+    {% endfor %}
+  {% endwith %}
+  {% block content %}{% endblock %}
+</div>
+</body>
+</html>
