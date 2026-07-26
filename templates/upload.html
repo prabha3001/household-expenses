@@ -11,12 +11,98 @@
     history — each file gets its own success/error message below. Uploading the exact same
     statement twice is safe — it's recognised and skipped rather than double-counted.
   </p>
-  <form method="post" enctype="multipart/form-data">
+  <form method="post" enctype="multipart/form-data" id="uploadForm">
     <label for="file">Statement PDF(s)</label>
     <input type="file" id="file" name="file" accept="application/pdf" multiple required>
-    <button class="primary" type="submit">Upload &amp; process</button>
+    <button class="primary" type="submit" id="uploadBtn">Upload &amp; process</button>
   </form>
+
+  <div id="uploadProgress" style="display:none;margin-top:16px;">
+    <div style="background:#e5e7eb;border-radius:6px;overflow:hidden;height:10px;">
+      <div id="uploadProgressBar" style="background:#2563eb;height:100%;width:0%;transition:width .2s ease;"></div>
+    </div>
+    <p id="uploadProgressText" class="muted" style="margin-top:6px;margin-bottom:0;"></p>
+    <ul id="uploadResults" style="margin-top:10px;padding-left:18px;"></ul>
+  </div>
 </div>
+
+<script>
+(function () {
+  var form = document.getElementById('uploadForm');
+  if (!form) return;
+
+  form.addEventListener('submit', function (e) {
+    var input = document.getElementById('file');
+    var files = input.files ? Array.prototype.slice.call(input.files) : [];
+    // If nothing is selected, or fetch isn't available for some reason,
+    // fall back to a normal full-page form submit (still handled fine by
+    // the server, just without a live progress bar).
+    if (!files.length || !window.fetch || !window.FormData) return;
+
+    e.preventDefault();
+
+    var btn = document.getElementById('uploadBtn');
+    var wrap = document.getElementById('uploadProgress');
+    var bar = document.getElementById('uploadProgressBar');
+    var text = document.getElementById('uploadProgressText');
+    var list = document.getElementById('uploadResults');
+
+    btn.disabled = true;
+    input.disabled = true;
+    wrap.style.display = 'block';
+    bar.style.width = '0%';
+    text.textContent = 'Starting upload of ' + files.length + ' file' + (files.length === 1 ? '' : 's') + '…';
+    list.innerHTML = '';
+
+    var uploadOneUrl = "{{ url_for('upload_one') }}";
+    var done = 0, successCount = 0, errorCount = 0;
+
+    function processNext(i) {
+      if (i >= files.length) {
+        text.textContent = 'Finished: ' + successCount + ' succeeded' +
+          (errorCount ? ', ' + errorCount + ' had a problem' : '') +
+          ' out of ' + files.length + ' file' + (files.length === 1 ? '' : 's') + '.';
+        btn.disabled = false;
+        input.disabled = false;
+        input.value = '';
+        return;
+      }
+
+      var file = files[i];
+      text.textContent = 'Processing ' + file.name + ' (' + (i + 1) + ' of ' + files.length + ')…';
+
+      var fd = new FormData();
+      fd.append('file', file);
+
+      fetch(uploadOneUrl, {method: 'POST', body: fd, credentials: 'same-origin'})
+        .then(function (resp) {
+          return resp.json().catch(function () {
+            // Server returned something that wasn't JSON (e.g. a proxy
+            // timeout page or a raw 500) — still surface a clear message
+            // instead of silently failing.
+            return {category: 'error', message: file.name + ': server error (status ' + resp.status + ').'};
+          });
+        })
+        .catch(function (networkErr) {
+          return {category: 'error', message: file.name + ': upload failed — ' + (networkErr && networkErr.message ? networkErr.message : 'network error') + '.'};
+        })
+        .then(function (result) {
+          if (result.category === 'error') { errorCount++; } else { successCount++; }
+          var li = document.createElement('li');
+          li.textContent = result.message || (file.name + ': unknown result.');
+          li.style.color = result.category === 'error' ? '#b91c1c' : '#15803d';
+          list.appendChild(li);
+
+          done++;
+          bar.style.width = Math.round((done / files.length) * 100) + '%';
+          processNext(i + 1);
+        });
+    }
+
+    processNext(0);
+  });
+})();
+</script>
 
 {% if recent %}
 <div class="card" style="max-width:900px;">
