@@ -185,8 +185,7 @@ def dashboard(period):
     user = auth_utils.current_user()
     ctx = build_dashboard_context(period)
     if ctx is None:
-        return render_template('base_app.html', user=user, ranges={}, page_title="Household Expenses",
-                                active_page=None) + EMPTY_STATE_HTML if False else _empty_state(user)
+        return _empty_state(user)
     return render_template('dashboard.html', user=user, **ctx)
 
 
@@ -237,88 +236,96 @@ def pdf_report(period):
 
 # ---------------- admin: upload ----------------
 
+def _process_one_statement(f, user):
+    """Parse, categorise and store one uploaded statement PDF.
+
+    Returns (category, message) where category is 'success' or 'error',
+    so multiple files can each report their own outcome in one batch.
+    """
+    filename = secure_filename(f.filename)
+    raw_bytes = f.read()
+    file_hash = hashlib.sha256(raw_bytes).hexdigest()
+    with tempfile.TemporaryDirectory() as td:
+        tmp_path = os.path.join(td, filename or 'statement.pdf')
+        with open(tmp_path, 'wb') as out:
+            out.write(raw_bytes)
+        try:
+            account, txns = parsers.detect_and_parse(tmp_path)
+        except parsers.UnknownStatementType as e:
+            return "error", f"{filename}: {e}"
+        except Exception as e:
+            return "error", f"{filename}: couldn't read this PDF ({e})"
+
+        # This exact file was already uploaded for this account — a
+        # harmless no-op instead of a second, identical set of
+        # transactions.
+        dup_file = db.run("SELECT * FROM statements WHERE account=? AND file_hash=?",
+                           (account, file_hash), fetch='one')
+        if dup_file:
+            return "success", (f"{filename}: this exact {account} statement was already uploaded on "
+                                f"{dup_file['uploaded_at'][:10]} — nothing new to add.")
+
+        for t in txns:
+            categorization.categorize_transaction(t)
+
+        # Barclaycard prints its own cover-period end date, which is a
+        # more reliable statement month than the latest transaction date
+        # (a billing cycle can end on a quiet week with no purchases).
+        # For the other 3 types, the latest transaction date is used.
+        period = None
+        if account == 'Barclaycard':
+            period = parsers.barclaycard_statement_period(tmp_path)
+        if not period:
+            period = parsers.infer_statement_month(txns)
+        if not period:
+            return "error", f"{filename}: couldn't work out which month this statement covers — no readable transaction dates found."
+
+        # All transactions on one statement are bucketed into that one
+        # statement's own reporting month (not each transaction's own
+        # individual date) — matches the original analysis pipeline, and
+        # keeps a statement's transactions from splitting across two
+        # different monthly reports just because a few dates fall right
+        # at the start/end of the billing period.
+        for t in txns:
+            t['month'] = period
+
+        _, statement_id = db.run(
+            "INSERT INTO statements (account, period, filename, file_hash, uploaded_by, uploaded_at, txn_count) "
+            "VALUES (?,?,?,?,?,?,?)",
+            (account, period, filename, file_hash, user['id'], db.now_iso(), len(txns)),
+            commit=True, returning_id=True,
+        )
+
+        for t in txns:
+            db.run(
+                "INSERT INTO transactions (statement_id, account, date, month, txn_desc, amount, dir, type, "
+                "category, subcategory, shopping_subcategory, canonical_merchant, is_dd, is_atm, is_refund) "
+                "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                (statement_id, t['account'], t['date'], t['month'], t['desc'], t['amount'], t['dir'],
+                 t.get('type', ''), t['category'], t.get('subcategory', ''), t.get('shopping_subcategory', ''),
+                 t.get('canonical_merchant', ''), int(t.get('is_dd', False)), int(t.get('is_atm', False)),
+                 int(t.get('is_refund', False))),
+                commit=True,
+            )
+
+        return "success", f"{filename}: {account} statement for {summary.month_label(period)} — {len(txns)} transactions added."
+
+
 @app.route('/admin/upload', methods=['GET', 'POST'])
 @auth_utils.admin_required
 def upload_page():
     user = auth_utils.current_user()
     if request.method == 'POST':
-        f = request.files.get('file')
-        if not f or not f.filename:
-            flash("Please choose a PDF file.", "error")
+        files = [f for f in request.files.getlist('file') if f and f.filename]
+        if not files:
+            flash("Please choose at least one PDF file.", "error")
             return redirect(url_for('upload_page'))
-        filename = secure_filename(f.filename)
-        raw_bytes = f.read()
-        file_hash = hashlib.sha256(raw_bytes).hexdigest()
-        with tempfile.TemporaryDirectory() as td:
-            tmp_path = os.path.join(td, filename or 'statement.pdf')
-            with open(tmp_path, 'wb') as out:
-                out.write(raw_bytes)
-            try:
-                account, txns = parsers.detect_and_parse(tmp_path)
-            except parsers.UnknownStatementType as e:
-                flash(str(e), "error")
-                return redirect(url_for('upload_page'))
-            except Exception as e:
-                flash(f"Couldn't read this PDF: {e}", "error")
-                return redirect(url_for('upload_page'))
 
-            # This exact file was already uploaded for this account — a
-            # harmless no-op instead of a second, identical set of
-            # transactions.
-            dup_file = db.run("SELECT * FROM statements WHERE account=? AND file_hash=?",
-                               (account, file_hash), fetch='one')
-            if dup_file:
-                flash(f"This exact {account} statement was already uploaded on "
-                      f"{dup_file['uploaded_at'][:10]} — nothing new to add.", "success")
-                return redirect(url_for('upload_page'))
+        for f in files:
+            category, message = _process_one_statement(f, user)
+            flash(message, category)
 
-            for t in txns:
-                categorization.categorize_transaction(t)
-
-            # Barclaycard prints its own cover-period end date, which is a
-            # more reliable statement month than the latest transaction date
-            # (a billing cycle can end on a quiet week with no purchases).
-            # For the other 3 types, the latest transaction date is used.
-            period = None
-            if account == 'Barclaycard':
-                period = parsers.barclaycard_statement_period(tmp_path)
-            if not period:
-                period = parsers.infer_statement_month(txns)
-            if not period:
-                flash("Couldn't work out which month this statement covers — no readable transaction dates found.", "error")
-                return redirect(url_for('upload_page'))
-
-            # All transactions on one statement are bucketed into that one
-            # statement's own reporting month (not each transaction's own
-            # individual date) — matches the original analysis pipeline, and
-            # keeps a statement's transactions from splitting across two
-            # different monthly reports just because a few dates fall right
-            # at the start/end of the billing period.
-            for t in txns:
-                t['month'] = period
-
-            _, statement_id = db.run(
-                "INSERT INTO statements (account, period, filename, file_hash, uploaded_by, uploaded_at, txn_count) "
-                "VALUES (?,?,?,?,?,?,?)",
-                (account, period, filename, file_hash, user['id'], db.now_iso(), len(txns)),
-                commit=True, returning_id=True,
-            )
-
-            for t in txns:
-                db.run(
-                    "INSERT INTO transactions (statement_id, account, date, month, txn_desc, amount, dir, type, "
-                    "category, subcategory, shopping_subcategory, canonical_merchant, is_dd, is_atm, is_refund) "
-                    "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
-                    (statement_id, t['account'], t['date'], t['month'], t['desc'], t['amount'], t['dir'],
-                     t.get('type', ''), t['category'], t.get('subcategory', ''), t.get('shopping_subcategory', ''),
-                     t.get('canonical_merchant', ''), int(t.get('is_dd', False)), int(t.get('is_atm', False)),
-                     int(t.get('is_refund', False))),
-                    commit=True,
-                )
-
-            flash(f"{account} statement for {summary.month_label(period)} — {len(txns)} transactions added.",
-                  "success")
-            return redirect(url_for('upload_page'))
+        return redirect(url_for('upload_page'))
 
     recent = db.run("SELECT * FROM statements ORDER BY uploaded_at DESC LIMIT 15", fetch='all')
     return render_template('upload.html', user=user, ranges=summary.pick_report_ranges(get_all_months()),
