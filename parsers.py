@@ -295,6 +295,39 @@ def detect_and_parse(pdf_path):
         "and try again, or upload a different statement."
     )
 
+SUPPORTED_EXTENSIONS = ('.pdf', '.csv', '.xlsx', '.xls', '.docx', '.jpg', '.jpeg', '.png')
+
+def parse_any(path, filename):
+    """
+    Dispatch to the right parser based on the uploaded file's extension.
+    PDFs go through the existing 4-format auto-detection above (unchanged).
+    CSV/XLSX/XLS, DOCX and JPG/PNG go through the best-effort generic parsers
+    in generic_parsers.py (column-header detection for spreadsheets/tables,
+    OCR + line-matching for scans, photos and free-text Word docs) — imported
+    lazily here so a plain-PDF deployment never has to load openpyxl/
+    python-docx/pytesseract unless one of those file types is actually used.
+    Returns (account_name, list_of_txn_dicts); raises UnknownStatementType on
+    an unrecognised extension or a file nothing could be parsed from.
+    """
+    ext = os.path.splitext(filename or '')[1].lower()
+    if ext in ('', '.pdf'):
+        return detect_and_parse(path)
+
+    import generic_parsers
+    if ext == '.csv':
+        return generic_parsers.parse_csv(path, filename)
+    if ext in ('.xlsx', '.xls'):
+        return generic_parsers.parse_excel(path, filename)
+    if ext == '.docx':
+        return generic_parsers.parse_docx_file(path, filename)
+    if ext in ('.jpg', '.jpeg', '.png'):
+        return generic_parsers.parse_image_ocr(path, filename)
+
+    raise UnknownStatementType(
+        f"Unsupported file type '{ext}'. Supported: PDF, CSV, Excel (.xlsx/.xls), Word (.docx), "
+        "and photo/scan (.jpg/.png)."
+    )
+
 MONTHS_MAP = {'Jan':1,'Feb':2,'Mar':3,'Apr':4,'May':5,'Jun':6,'Jul':7,'Aug':8,'Sep':9,'Oct':10,'Nov':11,'Dec':12}
 _DATE_RE = re.compile(r'(\d{2})\s*(\w{3})\s*(\d{2,4})')
 

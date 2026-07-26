@@ -238,7 +238,11 @@ def pdf_report(period):
 # ---------------- admin: upload ----------------
 
 def _process_one_statement(f, user):
-    """Parse, categorise and store one uploaded statement PDF.
+    """Parse, categorise and store one uploaded statement file.
+
+    Accepts PDF (the 4 natively-recognised layouts), CSV/Excel bank exports,
+    Word documents, and photographed/scanned images (via OCR) — see
+    parsers.parse_any() / generic_parsers.py for the format-specific logic.
 
     Returns (category, message) where category is 'success' or 'error',
     so multiple files can each report their own outcome in one batch.
@@ -251,11 +255,11 @@ def _process_one_statement(f, user):
         with open(tmp_path, 'wb') as out:
             out.write(raw_bytes)
         try:
-            account, txns = parsers.detect_and_parse(tmp_path)
+            account, txns = parsers.parse_any(tmp_path, filename or 'statement.pdf')
         except parsers.UnknownStatementType as e:
             return "error", f"{filename}: {e}"
         except Exception as e:
-            return "error", f"{filename}: couldn't read this PDF ({e})"
+            return "error", f"{filename}: couldn't read this file ({e})"
 
         # This exact file was already uploaded for this account — a
         # harmless no-op instead of a second, identical set of
@@ -274,7 +278,7 @@ def _process_one_statement(f, user):
         # (a billing cycle can end on a quiet week with no purchases).
         # For the other 3 types, the latest transaction date is used.
         period = None
-        if account == 'Barclaycard':
+        if account == 'Barclaycard' and tmp_path.lower().endswith('.pdf'):
             period = parsers.barclaycard_statement_period(tmp_path)
         if not period:
             period = parsers.infer_statement_month(txns)
@@ -327,7 +331,7 @@ def upload_page():
     if request.method == 'POST':
         files = [f for f in request.files.getlist('file') if f and f.filename]
         if not files:
-            flash("Please choose at least one PDF file.", "error")
+            flash("Please choose at least one statement file.", "error")
             return redirect(url_for('upload_page'))
 
         for f in files:
@@ -368,6 +372,30 @@ def upload_one():
         category, message = 'error', f"{secure_filename(f.filename)}: something went wrong processing this file ({e})."
     status_code = 200 if category == 'success' else 422
     return jsonify(category=category, message=message), status_code
+
+
+@app.route('/admin/statements')
+@auth_utils.admin_required
+def statement_history():
+    """Full, paginated upload history — every statement ever uploaded, not
+    just the most-recent 15 shown inline on the upload page itself."""
+    user = auth_utils.current_user()
+    per_page = 25
+    total = db.run("SELECT COUNT(*) AS c FROM statements", fetch='one')['c']
+    total_pages = max(1, (total + per_page - 1) // per_page)
+    page = request.args.get('page', 1, type=int) or 1
+    page = min(max(page, 1), total_pages)
+    offset = (page - 1) * per_page
+
+    rows = db.run(
+        "SELECT * FROM statements ORDER BY uploaded_at DESC LIMIT ? OFFSET ?",
+        (per_page, offset), fetch='all',
+    )
+    return render_template(
+        'statement_history.html', user=user, ranges=summary.pick_report_ranges(get_all_months()),
+        active_page='upload', page_title="Upload history", statements=rows,
+        month_label=summary.month_label, page=page, total_pages=total_pages, total=total,
+    )
 
 
 # ---------------- self-service: change own password ----------------
