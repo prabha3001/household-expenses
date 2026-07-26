@@ -2,18 +2,26 @@
 {% block content %}
 <h1>Upload a monthly statement</h1>
 <div class="card">
-  <h2>Add statement PDFs</h2>
+  <h2>Add statements</h2>
   <p class="muted" style="margin-top:-6px;margin-bottom:14px;">
     Upload any of the 4 statement types — HSBC Current Account, HSBC Credit Card, Halifax Current
-    Account, or Barclaycard. You can select several PDFs at once (even a mix of different types);
+    Account, or Barclaycard. You can select several files at once (even a mix of different types);
     the system reads each one to work out which type it is, extracts every transaction,
     categorises it the same way as the rest of the dashboard, and merges it into the shared
     history — each file gets its own success/error message below. Uploading the exact same
     statement twice is safe — it's recognised and skipped rather than double-counted.
   </p>
+  <p class="muted" style="margin-top:-6px;margin-bottom:14px;">
+    Supported file types: <strong>PDF</strong> (most reliable — the 4 formats above are read exactly),
+    <strong>CSV / Excel</strong> exports from your bank (matched by column headers like Date/Description/
+    Amount or Debit/Credit), <strong>Word documents</strong> (reads a table if there is one, otherwise
+    scans the text), and <strong>photos or scans (JPG/PNG)</strong> via text recognition. CSV/Excel is
+    just as reliable as PDF when the file has a proper header row; Word-without-a-table and photos/scans
+    are best-effort — check the results below and re-upload a clearer file if a payment looks missing.
+  </p>
   <form method="post" enctype="multipart/form-data" id="uploadForm">
-    <label for="file">Statement PDF(s)</label>
-    <input type="file" id="file" name="file" accept="application/pdf" multiple required>
+    <label for="file">Statement file(s)</label>
+    <input type="file" id="file" name="file" accept=".pdf,.csv,.xlsx,.xls,.docx,.jpg,.jpeg,.png" multiple required>
     <button class="primary" type="submit" id="uploadBtn">Upload &amp; process</button>
   </form>
 
@@ -106,7 +114,10 @@
 
 {% if recent %}
 <div class="card" style="max-width:900px;">
-  <h2>Recently uploaded statements</h2>
+  <div style="display:flex;align-items:baseline;justify-content:space-between;gap:12px;">
+    <h2 style="margin-bottom:10px;">Recently uploaded statements</h2>
+    <a href="{{ url_for('statement_history') }}" style="font-size:12.5px;white-space:nowrap;">View full upload history &rarr;</a>
+  </div>
   <table>
     <tr><th>Account</th><th>Period</th><th>Transactions</th><th>Uploaded</th></tr>
     {% for s in recent %}
